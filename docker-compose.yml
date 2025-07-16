@@ -43,12 +43,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    # Remove --gpus=all if you don't have an NVIDIA GPU or if you want to use CPU
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
+    # No GPU configuration needed for CPU usage
     ports:
       - "11434:11434" # Expose Ollama's API directly for other services (e.g., Open WebUI)
     volumes:

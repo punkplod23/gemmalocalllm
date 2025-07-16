@@ -53,3 +53,6 @@ Simple local LLM stack using Docker and Traefik.
 
 - If you encounter network errors, ensure the `llm-web-app-network` exists and is external.
 - Check container logs with `docker logs <container_name>` for more details.
+
+## example
+curl -k -X POST \ https://ollama.localhost/api/generate \ -H "Content-Type: application/json" \ -d '{   "model": "gemma:2b",    "prompt": "Tell me a short, funny story about a talking cat.",  "stream": false}'
