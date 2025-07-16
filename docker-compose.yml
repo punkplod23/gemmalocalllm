@@ -1,0 +1,90 @@
+services:
+  traefik:
+    image: traefik:v3.1 # Or latest stable version
+    container_name: traefik
+    command:
+      # Enable Docker provider and expose by default to false (we'll enable per service)
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      # Entrypoints for HTTP and HTTPS
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Enable the Traefik dashboard (for monitoring, disable in production if not needed)
+      - --api.dashboard=true
+      - --api.insecure=false # Set to true for local testing without authentication
+      # Configure Let's Encrypt for automatic HTTPS
+      #- --certificatesresolvers.myresolver.acme.tlschallenge=true
+      #- --certificatesresolvers.myresolver.acme.email=your-email@example.com # <--- CHANGE THIS
+      #- --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+      # Optional: Use Let's Encrypt staging environment for testing to avoid rate limits
+      # - --certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --log.level=INFO # DEBUG, INFO, WARN, ERROR
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard (remove or restrict in production)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # So Traefik can read Docker events
+      - ./letsencrypt:/letsencrypt # Volume to store Let's Encrypt certificates
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      # Traefik Dashboard Configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`)" # Change to your desired domain
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      # Optional: Add basic authentication to dashboard
+      # - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+      # - "traefik.http.middlewares.traefik-auth.basicauth.users=user:$$apr1$$passwordhash" # Replace with htpasswd generated hash
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    # Remove --gpus=all if you don't have an NVIDIA GPU or if you want to use CPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    ports:
+      - "11434:11434" # Expose Ollama's API directly for other services (e.g., Open WebUI)
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ollama.rule=Host(`ollama.localhost`)"
+      - "traefik.http.routers.ollama.entrypoints=websecure"
+      - "traefik.http.routers.ollama.tls.certresolver=myresolver"
+      - "traefik.http.services.ollama.loadbalancer.server.port=11434" # Port Ollama listens on
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    environment:
+      # Point Open WebUI to the Ollama container via its service name within the Docker network
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - open_webui_data:/app/backend/data
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webui.rule=Host(`webui.localhost`)"
+      - "traefik.http.routers.webui.entrypoints=websecure"
+      - "traefik.http.routers.webui.tls.certresolver=myresolver"
+      - "traefik.http.services.webui.loadbalancer.server.port=8080" # Default port for Open WebUI
+
+volumes:
+  ollama_data:
+  open_webui_data:
+
+networks:
+  llm-web-app-network:
+    external: true # Use the pre-created 'web' network
