@@ -39,24 +39,98 @@ services:
       # Optional: Add basic authentication to dashboard
       # - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
       # - "traefik.http.middlewares.traefik-auth.basicauth.users=user:$$apr1$$passwordhash" # Replace with htpasswd generated hash
-
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ollama
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ollama
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./csv:/csv:ro # Mount a host directory for CSV files
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+      
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    # No GPU configuration needed for CPU usage
     ports:
       - "11434:11434" # Expose Ollama's API directly for other services (e.g., Open WebUI)
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - llm-web-app-network
+    # Add environment variables for Postgres connection
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ollama
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ollama
     restart: unless-stopped
+    depends_on:
+      - postgres
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ollama.rule=Host(`ollama.localhost`)"
       - "traefik.http.routers.ollama.entrypoints=websecure"
       - "traefik.http.routers.ollama.tls.certresolver=myresolver"
       - "traefik.http.services.ollama.loadbalancer.server.port=11434" # Port Ollama listens on
+      - "hardware-type=nvidia" # 🔥 Use this label to indicate GPU usage
+    #deploy:
+      #resources:
+        #reservations:
+          #devices:
+            #- driver: nvidia
+              #count: all
+              #capabilities: [gpu]
+
+  ollama-model-loader:
+    image: docker:latest  # 🔥 Uses Docker CLI instead of Ollama
+    container_name: ollama-model-loader
+    depends_on:
+      - ollama
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # 🔥 Allows running commands inside containers
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "⏳ Waiting for Ollama to be ready..."
+        until docker exec ollama ollama list >/dev/null 2>&1; do
+            sleep 2
+        done
+        echo "📥 Pulling models inside Ollama container..."
+        docker exec ollama ollama pull gemma:2b
+
+        docker exec ollama ollama pull qwen2.5-coder:1.5b
+        docker exec ollama ollama pull codegemma:2b
+        docker exec ollama ollama pull gemma3:270m
+
+        echo "✅ Models downloaded. Exiting..."
+    restart: "no"
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chroma.rule=Host(`chroma.localhost`)"
+      - "traefik.http.routers.chroma.entrypoints=websecure"
+      - "traefik.http.routers.chroma.tls.certresolver=myresolver"
+      - "traefik.http.services.chroma.loadbalancer.server.port=8000"
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -76,10 +150,42 @@ services:
       - "traefik.http.routers.webui.tls.certresolver=myresolver"
       - "traefik.http.services.webui.loadbalancer.server.port=8080" # Default port for Open WebUI
 
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    ports:
+      - "8081:8080"
+    networks:
+      - llm-web-app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`adminer.localhost`)"
+      - "traefik.http.routers.adminer.entrypoints=web" # <-- change from websecure to web
+      # - "traefik.http.routers.adminer.tls.certresolver=myresolver" # <-- comment out or remove
+      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+
+  unsloth-training:
+    container_name: unsloth-training
+    build:
+      context: ./unsloth # Path to the directory with the Dockerfile
+    volumes:
+      # Mount a directory for your training data (read-only)
+      - ./training_data:/app/data:ro
+      # Mount a directory to save the trained LoRA adapters
+      - ./lora_adapters:/app/lora_adapters
+    networks:
+      - llm-web-app-network
+    restart: "no"
+
+
 volumes:
   ollama_data:
   open_webui_data:
+  postgres_data:
+  chroma_data:
 
 networks:
   llm-web-app-network:
-    external: true # Use the pre-created 'web' network

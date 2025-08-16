@@ -1,0 +1,281 @@
+# ollama-k8s.yml
+# This file contains all the necessary Kubernetes resources to deploy the Ollama service.
+# Apply it to your cluster with: kubectl apply -f ollama-k8s.yml
+
+# --- Prerequisites ---
+# 1. A running Kubernetes cluster.
+# 2. The NVIDIA Device Plugin for Kubernetes installed to manage GPU resources.
+# 3. The Traefik Ingress Controller installed in your cluster.
+
+---
+# 1. Secret for PostgreSQL credentials
+# It's best practice to store sensitive data like passwords in Secrets.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ollama-postgres-secret
+stringData:
+  # The key 'password' will be referenced by the Deployment.
+  password: "password"
+
+---
+# 2. PersistentVolumeClaim for Ollama data
+# This requests persistent storage from your cluster, replacing the Docker named volume 'ollama_data'.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce # This volume can be mounted as read-write by a single node
+  resources:
+    requests:
+      storage: 10Gi # Adjust the size as needed for your models
+
+---
+# 3. Deployment for the Ollama application
+# This manages the Ollama pod, ensuring it runs and is configured correctly.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-deployment
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres" # Assumes a Service named 'postgres' exists in the same namespace
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              value: "ollama"
+            - name: POSTGRES_DB
+              value: "ollama"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ollama-postgres-secret
+                  key: password
+          volumeMounts:
+            - name: ollama-storage
+              mountPath: /root/.ollama
+          resources:
+            limits:
+              # This is the Kubernetes way to request a GPU.
+              # It replaces the 'deploy.resources' section from docker-compose.
+              nvidia.com/gpu: 1
+      volumes:
+        - name: ollama-storage
+          persistentVolumeClaim:
+            claimName: ollama-pvc
+
+---
+# 4. Service to expose Ollama internally
+# This gives other pods in the cluster a stable DNS name ('ollama') to connect to.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - protocol: TCP
+      port: 11434
+      targetPort: 11434
+
+---
+# 5. Traefik IngressRoute for external access
+# This replaces the Traefik labels from docker-compose.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ollama-ingress
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`ollama.localhost`)
+      kind: Rule
+      services:
+        - name: ollama
+          port: 11434
+  tls:
+    certResolver: myresolver
+
+---
+# --- Open WebUI Resources ---
+
+---
+# 6. PersistentVolumeClaim for Open WebUI data
+# This requests persistent storage for Open WebUI's backend data.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: open-webui-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi # Adjust size as needed
+
+---
+# 7. Deployment for the Open WebUI application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui-deployment
+  labels:
+    app: open-webui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: open-webui
+  template:
+    metadata:
+      labels:
+        app: open-webui
+    spec:
+      containers:
+        - name: open-webui
+          image: ghcr.io/open-webui/open-webui:main
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OLLAMA_BASE_URL
+              value: "http://ollama:11434" # Points to the Ollama Service
+          volumeMounts:
+            - name: open-webui-storage
+              mountPath: /app/backend/data
+      volumes:
+        - name: open-webui-storage
+          persistentVolumeClaim:
+            claimName: open-webui-pvc
+
+---
+# 8. Service to expose Open WebUI internally
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-webui
+spec:
+  selector:
+    app: open-webui
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+
+---
+# 9. Traefik IngressRoute for Open WebUI
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: open-webui-ingress
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`webui.localhost`)
+      kind: Rule
+      services:
+        - name: open-webui
+          port: 8080
+  tls:
+    certResolver: myresolver
+
+---
+# --- ChromaDB Resources ---
+
+---
+# 10. PersistentVolumeClaim for ChromaDB data
+# This requests persistent storage for ChromaDB's vector store.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi # Adjust size as needed
+
+---
+# 11. Deployment for the ChromaDB application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chromadb-deployment
+  labels:
+    app: chromadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chromadb
+  template:
+    metadata:
+      labels:
+        app: chromadb
+    spec:
+      containers:
+        - name: chromadb
+          image: chromadb/chroma:latest
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: chroma-storage
+              mountPath: /chroma/chroma
+      volumes:
+        - name: chroma-storage
+          persistentVolumeClaim:
+            claimName: chroma-pvc
+
+---
+# 12. Service to expose ChromaDB internally
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb
+spec:
+  selector:
+    app: chromadb
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+
+---
+# 13. Traefik IngressRoute for ChromaDB
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: chroma-ingress
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`chroma.localhost`)
+      kind: Rule
+      services:
+        - name: chromadb
+          port: 8000
+  tls:
+    certResolver: myresolver

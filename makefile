@@ -6,3 +6,4 @@ install:
 
 run:
 	docker exec -it ollama ollama run gemma:2b	
+
