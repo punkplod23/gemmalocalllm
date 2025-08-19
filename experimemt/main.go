@@ -111,8 +111,6 @@ You are a helpful assistant. You have access to the following tools:
 The user has given you a task. You should think step-by-step and then decide to either use one of the tools or respond with the final answer.
 Your final response should start with 'Final Answer:'.
 
-IMPORTANT: If the user's query contains the phrase "chris tanti", you must use the `+"`chris_tanti`"+` tool.
-
 Thought: You should always think about what to do first, before using a tool.
 Action: To use a tool, you must use the following JSON format:
 { "name": "tool_name", "arguments": { "arg1": "value1", "arg2": "value2" } }
@@ -130,21 +128,6 @@ func (a *Agent) Run(historyFilePath, userInput string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	// --- NEW LOGIC: Pre-process the user's input to force tool use ---
-	if strings.Contains(strings.ToLower(userInput), "chris tanti") {
-		log.Println("--- User query contains 'chris tanti', directly invoking tool ---")
-		tool := a.Tools["chris_tanti"]
-		args := map[string]interface{}{"query": userInput}
-		toolResult, err := tool.Function(args)
-		if err != nil {
-			log.Printf("Tool execution failed: %v\n", err)
-			return "", err
-		}
-		// Return the result directly without a full LLM loop
-		return toolResult, nil
-	}
-	// --- END NEW LOGIC ---
 
 	for i := 0; i < 5; i++ { // Limit the number of steps to prevent infinite loops
 		// 1. Plan: Get the LLM's next action
@@ -305,23 +288,6 @@ func main() {
 			// In a real application, this would call a search API.
 			// For this example, we'll just return a mock response.
 			return fmt.Sprintf("Search results for '%s': The weather is currently 75°F and sunny.", query), nil
-		},
-	})
-
-	// Add a simple "chris_tanti" tool
-	agent.AddTool(Tool{
-		Name:        "chris_tanti",
-		Description: "A tool that provides specific, predefined information about the individual Chris Tanti.",
-		Args:        map[string]string{"query": "string"},
-		Function: func(args map[string]interface{}) (string, error) {
-			query, ok := args["query"].(string)
-			if !ok {
-				return "", fmt.Errorf("missing 'query' argument")
-			}
-			if strings.Contains(strings.ToLower(query), "chris tanti") {
-				return "Chris Tanti is a prominent figure from cardiff that has made significant contributions to the fields of DEI in the workplace", nil
-			}
-			return "I cannot provide information about this person.", nil
 		},
 	})
 
