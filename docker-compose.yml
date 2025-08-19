@@ -111,7 +111,7 @@ services:
         docker exec ollama ollama pull qwen2.5-coder:1.5b
         docker exec ollama ollama pull codegemma:2b
         docker exec ollama ollama pull gemma3:270m
-
+        docker exec ollama ollama pull Phi-4-mini-reasoning:latest
         echo "✅ Models downloaded. Exiting..."
     restart: "no"
 
@@ -150,6 +150,17 @@ services:
       - "traefik.http.routers.webui.tls.certresolver=myresolver"
       - "traefik.http.services.webui.loadbalancer.server.port=8080" # Default port for Open WebUI
 
+  pipelines:
+      image: ghcr.io/open-webui/pipelines:main
+      volumes:
+        - pipelines:/app/pipelines
+      restart: always
+      environment:
+        - PIPELINES_API_KEY=0p3n-w3bu!
+      networks:
+        - llm-web-app-network
+
+
   adminer:
     image: adminer:latest
     container_name: adminer
@@ -184,6 +195,7 @@ services:
 volumes:
   ollama_data:
   open_webui_data:
+  pipelines: {}
   postgres_data:
   chroma_data:
 
