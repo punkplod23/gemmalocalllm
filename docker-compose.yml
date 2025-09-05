@@ -111,7 +111,7 @@ services:
         docker exec ollama ollama pull qwen2.5-coder:1.5b
         docker exec ollama ollama pull codegemma:2b
         docker exec ollama ollama pull gemma3:270m
-        docker exec ollama ollama pull Phi-4-mini-reasoning:latest
+        docker exec ollama ollama pull phi4-mini-reasoning:latest
         echo "✅ Models downloaded. Exiting..."
     restart: "no"
 

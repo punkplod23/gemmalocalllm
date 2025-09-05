@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pipelines-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pipelines
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pipelines
+  template:
+    metadata:
+      labels:
+        app: pipelines
+    spec:
+      containers:
+      - name: pipelines
+        image: ghcr.io/open-webui/pipelines:main
+        env:
+        - name: PIPELINES_API_KEY
+          value: "0p3n-w3bu!"
+        volumeMounts:
+        - name: pipelines-data
+          mountPath: /app/pipelines
+      volumes:
+      - name: pipelines-data
+        persistentVolumeClaim:
+          claimName: pipelines-pvc

@@ -189,7 +189,7 @@ func main() {
 
 	// 2. Prepare the API request with a user prompt and the tool definition.
 	requestData := OllamaRequest{
-		Model:  "phi4-mini-reasoning:latest",
+		Model:  "gemma:2b",
 		Prompt: "Check the disk space and perform a cleanup if necessary.",
 		Tools:  []Tool{toolDef},
 		Stream: false,
@@ -204,7 +204,7 @@ func main() {
 	}
 
 	// 3. Send the request to the local Ollama API.
-	resp, err := http.Post("http://ollama.localhost:11434/api/generate", "application/json", bytes.NewBuffer(jsonBytes))
+	resp, err := http.Post("http://ollama.localhost/api/generate", "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		fmt.Println("Error making API request:", err)
 		return

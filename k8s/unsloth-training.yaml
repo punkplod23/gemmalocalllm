@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unsloth-training
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unsloth-training
+  template:
+    metadata:
+      labels:
+        app: unsloth-training
+    spec:
+      containers:
+      - name: unsloth-training
+        image: unsloth-training:latest
+        volumeMounts:
+        - name: training-data
+          mountPath: /app/data
+          readOnly: true
+        - name: lora-adapters
+          mountPath: /app/lora_adapters
+      volumes:
+      - name: training-data
+        hostPath:
+          path: /training_data
+          type: DirectoryOrCreate
+      - name: lora-adapters
+        hostPath:
+          path: /lora_adapters
+          type: DirectoryOrCreate
