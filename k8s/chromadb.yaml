@@ -30,7 +30,7 @@ spec:
         - containerPort: 8000
         volumeMounts:
         - name: chroma-data
-          mountPath: /chroma/chroma
+          mountPath: /data
       volumes:
       - name: chroma-data
         persistentVolumeClaim:

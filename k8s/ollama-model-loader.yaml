@@ -9,11 +9,3 @@ spec:
       containers:
       - name: model-loader
         image: ollama/ollama:latest
-        command: ["sh", "-c"]
-        args:
-          - |
-            ollama pull gemma3:270m
-            ollama pull phi4-mini-reasoning:latest
-            ollama pull gemma:2b
-            ollama pull qwen2.5-coder:1.5b
-            ollama pull codegemma:2b

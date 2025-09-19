@@ -1,18 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: open-webui-ingress
+  name: chromadb-ingress
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   rules:
-  - host: webui.localhost
+  - host: chromadb.localhost
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: open-webui
+            name: chromadb
             port:
-              number: 8080
+              number: 8000

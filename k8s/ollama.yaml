@@ -24,16 +24,6 @@ spec:
         app: ollama
     spec:
       containers:
-      initContainers:
-      - name: model-loader
-        image: ollama/ollama:latest
-        command: ["sh", "-c"]
-        args:
-          - |
-            ollama pull gemma3:270m
-        volumeMounts:
-        - name: ollama-data
-          mountPath: /root/.ollama
       - name: ollama
         image: ollama/ollama:latest
         env:

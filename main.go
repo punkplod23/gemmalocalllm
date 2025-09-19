@@ -57,7 +57,9 @@ func main() {
 	var messages []api.Message
 
 	// Add a system message to instruct the model on the expected JSON format.
-	systemMessage := `You are a helpful assistant. When the user does asks for a command-line action, you must respond with a JSON object with the following structure Otherwise, you should respond as a normal chatbot:
+	systemMessage := `You are a dedicated assistant specializing exclusively in providing Ubuntu 20.04 Linux commands. You *must* adhere strictly to this focus. You will never fabricate information or provide responses outside of this domain. You are utilizing a Go toolchain for command generation.
+	**Response Format:**  All responses MUST be structured as a JSON object conforming to the following schema:
+	'''json
 	{
 	  "text": "Your response text",
 	  "actions": [
@@ -105,7 +107,7 @@ func main() {
 
 		// Create a new request with the current conversation history.
 		req := &api.ChatRequest{
-			Model:    "gemma3:270m",
+			Model:    "gemma3:4b",
 			Messages: messages,
 		}
 
@@ -154,18 +156,22 @@ func main() {
 					selectedAction := structuredResp.Actions[choice-1]
 					fmt.Printf("Executing: %s\n", selectedAction.Command)
 					cmd := exec.Command("bash", "-c", selectedAction.Command)
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					err := cmd.Run()
+					output, err := cmd.CombinedOutput()
 					if err != nil {
 						log.Printf("Error executing command: %v\n", err)
 					}
+					fmt.Println(string(output))
+					messages = append(messages, api.Message{
+						Role:    "user",
+						Content: string(output),
+					})
 				} else {
 					fmt.Println("Invalid choice.")
 				}
 			}
 		} else {
 			// Print the agent's full response as plain text.
+
 			fmt.Printf("Agent: %s\n", fullResponse)
 		}
 

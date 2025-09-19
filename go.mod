@@ -1,4 +1,4 @@
-module experiment/agent
+module gemmalocalllm
 
 go 1.24.1
 

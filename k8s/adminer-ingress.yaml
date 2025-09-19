@@ -1,18 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: open-webui-ingress
+  name: adminer-ingress
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   rules:
-  - host: webui.localhost
+  - host: adminer.localhost
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: open-webui
+            name: adminer
             port:
-              number: 8080
+              number: 8081

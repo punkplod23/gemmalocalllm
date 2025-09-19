@@ -133,7 +133,7 @@ services:
       - "traefik.http.services.chroma.loadbalancer.server.port=8000"
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:main
+    image: ghcr.io/open-webui/open-webui:latest
     container_name: open-webui
     environment:
       # Point Open WebUI to the Ollama container via its service name within the Docker network
@@ -151,7 +151,7 @@ services:
       - "traefik.http.services.webui.loadbalancer.server.port=8080" # Default port for Open WebUI
 
   pipelines:
-      image: ghcr.io/open-webui/pipelines:main
+      image: ghcr.io/open-webui/pipelines:latest
       volumes:
         - pipelines:/app/pipelines
       restart: always
